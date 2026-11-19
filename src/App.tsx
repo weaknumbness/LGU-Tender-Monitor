@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { load as readWorkspace, save as persist } from "./lib/storage";
 import { importFile } from "./lib/importFile";
-import "./App.css";
+import "./css/App.css";
 import {
   Search,
   Plus,
