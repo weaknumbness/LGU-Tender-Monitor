@@ -185,21 +185,29 @@ export default function Home() {
       setBusy(false);
     }
   }
-  async function upload(file: File) {
+  async function upload(files: File[]) {
     setBusy(true);
     try {
-      const r = await importFile(file, records);
-      await commit({ profiles: ps, tenders: r.tenders, blacklist });
+      let next = records, total = 0, added = 0, skipped = 0;
+      for (const file of files) {
+        try {
+          const r = await importFile(file, next);
+          next = r.tenders; total += r.total; added += r.added; skipped += r.skipped;
+        } catch (error) {
+          throw Error(file.name + ": " + (error instanceof Error ? error.message : "Ошибка чтения") + " Изменения не сохранены.");
+        }
+      }
+      await commit({ profiles: ps, tenders: next, blacklist });
       setDemo(false);
       setScreening("matched");
       setFaculty("all");
       setStatus("all");
       setQ("");
       setView("feed");
-      toast.success("Прочитано: " + r.total + ". Новых: " + r.added + ".");
+      toast.success(`Новых: ${added}. Повторных: ${total - added}. Не распознано: ${skipped}.`);
     } catch (e) {
       toast.error(
-        e instanceof Error ? e.message : "Не удалось импортировать RSS.",
+        e instanceof Error ? e.message : "Не удалось импортировать файлы.",
       );
     } finally {
       setBusy(false);
@@ -282,7 +290,7 @@ export default function Home() {
                 window.scrollTo({ top: 0, behavior: "smooth" });
               }}
             >
-              Импорт RSS-файла
+              Импорт RSS и HTML
             </button>
             <button className="primary" onClick={() => setAdd(true)}>
               <Plus size={18} /> Проверить закупку
@@ -330,7 +338,7 @@ export default function Home() {
               </div>
               <div className="source-stat">
                 <span>Источник</span>
-                <strong className="source-status">RSS · файл</strong>
+                <strong className="source-status">RSS / HTML</strong>
                 <button onClick={() => setView("source")}>
                   Импорт файла <ArrowUpRight size={14} />
                 </button>
@@ -571,23 +579,24 @@ export default function Home() {
             <div className="import-box">
               <FileText className="import-icon" size={52} />
               <div className="import-copy">
-                <h2>Импорт RSS-файла ЕИС</h2>
+                <h2>Импорт файлов ЕИС: RSS и HTML</h2>
                 <p>
-                  Выберите сохранённый файл до 2 МБ. Заметки и статусы
+                  Сохраните каждую нужную страницу выдачи ЕИС через Ctrl+S как HTML. Выберите сразу несколько страниц или RSS-файлов (HTML до 16 МБ, RSS до 2 МБ). Заметки и статусы
                   сохраняются при повторном импорте.
                 </p>
               </div>
               <label className="primary import-button">
-                Выбрать файл
+                Выбрать файлы
                 <input
                   className="file-input"
                   type="file"
                   disabled={busy || !ready}
-                  accept=".xml,.rss,.html,.txt"
+                  multiple
+                  accept=".xml,.rss,.html,.htm,.txt"
                   onChange={(e) => {
-                    const f = e.target.files?.[0];
+                    const f = Array.from(e.target.files ?? []);
                     e.target.value = "";
-                    if (f) void upload(f);
+                    if (f.length) void upload(f);
                   }}
                 />
               </label>
@@ -639,7 +648,7 @@ export default function Home() {
                 {selected.demo ?
                   "Вымышленный пример. Не является извещением ЕИС."
                 : selected.source === "eis-file" ?
-                  "Импортировано из сохранённого RSS-файла. Актуальность и сроки проверьте в ЕИС."
+                  "Импортировано из файла ЕИС. Актуальность и сроки проверьте в ЕИС."
                 : selected.source === "eis-rss" ?
                   "Загружено из RSS ЕИС. Сверьте сведения и сроки с извещением."
                 : "Добавлено вручную. Сверьте сведения с извещением."}
